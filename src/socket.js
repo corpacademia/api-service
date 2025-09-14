@@ -1,64 +1,72 @@
-import { Server } from "socket.io";
-import redis from "redis";
+const { Server } = require("socket.io");
+const redis = require("redis");
 
 let io;
 
-export const initSocket = (server) => {
+const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173", // frontend URL
+      origin: "https://app.golabing.ai", // ✅ Use your production frontend URL
       methods: ["GET", "POST"],
       credentials: true,
     },
   });
 
-  // Create Redis clients
-  const subscriber = redis.createClient(6379, "localhost");
-
-  subscriber.on("error", (err) => {
-    console.error("Redis Sub Error:", err);
+  // Redis subscriber client
+  const subscriber = redis.createClient({
+    socket: {
+      host: "localhost", // or your Redis host
+      port: 6379,
+    }
   });
 
-  // 🔔 Subscribe to notification channel
-  subscriber.subscribe("notification");
+  subscriber.connect().catch(console.error);
 
-  subscriber.on("message", (channel, message) => {
-    if (channel === "notification") {
-      try {
-        const { userId, notification } = JSON.parse(message);
-        console.log("📥 Received notification from Redis:");
+  subscriber.on("error", (err) => {
+    console.error("❌ Redis error:", err);
+  });
 
-        // Forward to socket.io room
-        io.to(`user_${userId}`).emit("notification", notification);
-        console.log(`🔔 Emitted notification to user_${userId}:`);
-      } catch (err) {
-        console.error("Failed to parse notification:", err);
-      }
+  subscriber.subscribe("notification", (message) => {
+    try {
+      const { userId, notification } = JSON.parse(message);
+      console.log("📥 Received notification:", notification);
+
+      // Send to user's socket room
+      io.to(`user_${userId}`).emit("notification", notification);
+      console.log(`🔔 Sent notification to user_${userId}`);
+    } catch (err) {
+      console.error("❌ Failed to parse notification:", err);
     }
   });
 
   io.on("connection", (socket) => {
-    console.log("New client connected:", socket.id);
+    console.log("✅ Client connected:", socket.id);
 
     socket.on("join_rooms", ({ userId, orgId }) => {
-      socket.join(`user_${userId}`);
-      console.log(`✅ ${socket.id} joined user_${userId}`);
-
+      if (userId) {
+        socket.join(`user_${userId}`);
+        console.log(`➕ ${socket.id} joined user_${userId}`);
+      }
       if (orgId) {
         socket.join(`org_${orgId}`);
-        console.log(`✅ ${socket.id} joined org_${orgId}`);
+        console.log(`➕ ${socket.id} joined org_${orgId}`);
       }
     });
 
     socket.on("disconnect", () => {
-      console.log("Client disconnected:", socket.id);
+      console.log("❌ Client disconnected:", socket.id);
     });
   });
 
   return io;
 };
 
-export const getIO = () => {
+const getIO = () => {
   if (!io) throw new Error("Socket.io not initialized!");
   return io;
+};
+
+module.exports = {
+  initSocket,
+  getIO,
 };
