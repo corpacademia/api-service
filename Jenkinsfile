@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION     = 'us-east-1'
         AWS_ACCOUNT_ID = '751057572977'
-        ECR_REPO       = 'user-service'
+        ECR_REPO       = 'api-service'
         IMAGE_TAG      = "${BUILD_NUMBER}"
         IMAGE_URI      = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
         IMAGE_LATEST   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
