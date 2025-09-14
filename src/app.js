@@ -6,13 +6,15 @@ const cookieParser = require('cookie-parser');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+
+// ✅ Socket.IO initialization
 const { initSocket } = require('./socket');
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-initSocket(server);
+initSocket(server); // ✅ Initialize WebSocket server
 
 // Middleware
 app.use(morgan("dev"));
@@ -20,9 +22,9 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(cookieParser());
 
-// ✅ CORS config for production
+// ✅ CORS configuration
 const corsOptions = {
-  origin: "https://app.golabing.ai", // updated
+  origin: "https://app.golabing.ai", // frontend URL
   credentials: true,
   methods: "GET, POST, PATCH, PUT, DELETE, OPTIONS",
   allowedHeaders: "Content-Type, Authorization"
@@ -38,12 +40,12 @@ if (!fs.existsSync(uploadsDir)) {
 // ✅ Serve static files
 app.use('/uploads', express.static(uploadsDir));
 
-// ✅ Health check endpoint (for ECS, ALB, uptime monitoring, etc.)
+// ✅ Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Route mounting
+// ✅ API Routes
 app.use('/api/v1/user_ms', require('./routes/user'));
 app.use('/api/v1/lab_ms', require('./routes/lab'));
 app.use('/api/v1/aws_ms', require('./routes/aws_service'));
