@@ -2,11 +2,16 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
+        AWS_REGION     = 'us-east-1'
         AWS_ACCOUNT_ID = '751057572977'
-        ECR_REPO = 'api-service'
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        IMAGE_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
+        ECR_REPO       = 'user-service'
+        IMAGE_TAG      = "${BUILD_NUMBER}"
+        IMAGE_URI      = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
+        IMAGE_LATEST   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
+
+        CLUSTER_NAME   = 'backend-services-ecs'
+        SERVICE_NAME   = 'task-api-service-service-b9zqgzv8'
+        TASK_FAMILY    = 'task-api-service'
     }
 
     stages {
@@ -32,7 +37,6 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker --version'
                 sh "docker build -t ${IMAGE_URI} ."
             }
         }
@@ -41,12 +45,54 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: '9df79d1f-0539-4d32-9b7d-02ed68426fb9' // ✅ Use your correct AWS credential ID
+                    credentialsId: '9df79d1f-0539-4d32-9b7d-02ed68426fb9'
                 ]]) {
                     sh '''
-                        aws --version
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
                         docker push $IMAGE_URI
+                        docker tag $IMAGE_URI $IMAGE_LATEST
+                        docker push $IMAGE_LATEST
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to ECS') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: '9df79d1f-0539-4d32-9b7d-02ed68426fb9'
+                ]]) {
+                    sh '''
+                        echo "🔄 Registering new ECS task definition revision..."
+
+                        # Fetch current task definition
+                        aws ecs describe-task-definition \
+                          --task-definition $TASK_FAMILY \
+                          --region $AWS_REGION \
+                          --query taskDefinition > taskdef.json
+
+                        # Remove read-only fields and update container image + env vars
+                        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                                .compatibilities, .registeredAt, .registeredBy)
+                            | .containerDefinitions[0].image = env.IMAGE_URI
+                            | .containerDefinitions[0].environment = [
+                                {"name":"FRONTEND_URL","value":"https://app.golabing.ai"},
+                                {"name":"NODE_ENV","value":"production"}
+                              ]' taskdef.json > new-taskdef.json
+
+                        # Register new revision
+                        aws ecs register-task-definition \
+                          --cli-input-json file://new-taskdef.json \
+                          --region $AWS_REGION
+
+                        echo "🚀 Updating ECS service with new task definition..."
+                        aws ecs update-service \
+                          --cluster $CLUSTER_NAME \
+                          --service $SERVICE_NAME \
+                          --force-new-deployment \
+                          --region $AWS_REGION
                     '''
                 }
             }
@@ -55,7 +101,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ Successfully pushed image to ECR: $IMAGE_URI"
+            echo "✅ Successfully deployed new image to ECS service: $SERVICE_NAME"
         }
         failure {
             echo "❌ Jenkins pipeline failed. Check logs."
