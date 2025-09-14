@@ -1,4 +1,4 @@
-pipeline {
+pipeline { 
     agent any
 
     environment {
@@ -37,7 +37,8 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_URI} ."
+                // Force clean build to ensure all modules are reinstalled
+                sh "docker build --no-cache -t ${IMAGE_URI} ."
             }
         }
 
