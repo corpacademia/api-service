@@ -3,15 +3,15 @@ pipeline {
 
     environment {
         AWS_REGION     = 'us-east-1'
-        AWS_ACCOUNT_ID = '751057572977'
-        ECR_REPO       = 'api-service'
+        AWS_ACCOUNT_ID = '751757577887'
+        ECR_REPO       = 'api-service-ecr'
         IMAGE_TAG      = "${BUILD_NUMBER}"
         IMAGE_URI      = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
         IMAGE_LATEST   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
 
-        CLUSTER_NAME   = 'backend-services-ecs'
-        SERVICE_NAME   = 'task-api-service-service-b9zqgzv8'
-        TASK_FAMILY    = 'task-api-service'
+        CLUSTER_NAME   = 'DevCluster-golabing'
+        SERVICE_NAME   = 'api-service-service-1d1lztdm'
+        TASK_FAMILY    = 'api-service'
     }
 
     stages {
@@ -46,7 +46,7 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: '9df79d1f-0539-4d32-9b7d-02ed68426fb9'
+                    credentialsId: 'a9cd0d04-49fd-4ec3-8fd0-29122149b3b6'
                 ]]) {
                     sh '''
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
@@ -63,7 +63,7 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: '9df79d1f-0539-4d32-9b7d-02ed68426fb9'
+                    credentialsId: 'a9cd0d04-49fd-4ec3-8fd0-29122149b3b6'
                 ]]) {
                     sh '''
                         echo "🔄 Registering new ECS task definition revision..."
